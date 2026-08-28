@@ -1,14 +1,16 @@
 import fs from "fs";
 import { fetchTrendingNews } from "./lib/news-source.js";
 import { generateNewsCaption } from "./lib/caption.js";
-import { postNewsLink } from "./lib/facebook-post.js";
+import { generateNewsCard } from "./lib/graphic-generator.js";
+import { postNewsPhoto } from "./lib/facebook-post.js";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const FB_PAGE_ID = process.env.FB_PAGE_ID;
 const FB_PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
 
 const STATE_FILE = "./state/posted.json";
-const MAX_HISTORY = 1000; // news moves fast, keep a bigger history than the movie bot
+const MAX_HISTORY = 1000;
+const TMP_DIR = "./tmp-news";
 
 function loadState() {
   if (!fs.existsSync(STATE_FILE)) return { posted: [] };
@@ -51,12 +53,26 @@ async function main() {
   const caption = await generateNewsCaption(article);
   console.log("Generated caption:\n", caption);
 
-  const result = await postNewsLink(article, caption);
-  console.log("Posted to Facebook successfully:", result.id);
+  const fullCaption = `${caption}\n\nPura article yahan padhein: ${article.link}`;
+
+  const cardPath = `${TMP_DIR}/card.jpg`;
+  console.log("Generating native graphic card...");
+  generateNewsCard({
+    headline: article.title,
+    source: article.source,
+    region: article.region,
+    outputPath: cardPath,
+    tmpDir: TMP_DIR,
+  });
+  console.log("Graphic generated:", cardPath);
+
+  const result = await postNewsPhoto(cardPath, fullCaption);
+  console.log("Posted to Facebook successfully:", result.id || result.post_id);
 
   state.posted.push(article.link);
   saveState(state);
 
+  fs.rmSync(TMP_DIR, { recursive: true, force: true });
   console.log("Run complete.");
 }
 
