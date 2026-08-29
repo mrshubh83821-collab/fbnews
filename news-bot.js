@@ -50,17 +50,19 @@ async function main() {
 
   console.log(`Selected: [${article.source}/${article.region}] ${article.title}`);
 
-  const caption = await generateNewsCaption(article);
+  const { caption, keyword } = await generateNewsCaption(article);
   console.log("Generated caption:\n", caption);
+  console.log("Stock photo search keyword:", keyword);
 
   const fullCaption = `${caption}\n\nPura article yahan padhein: ${article.link}`;
 
   const cardPath = `${TMP_DIR}/card.jpg`;
   console.log("Generating native graphic card...");
-  generateNewsCard({
+  await generateNewsCard({
     headline: article.title,
     source: article.source,
     region: article.region,
+    keyword,
     outputPath: cardPath,
     tmpDir: TMP_DIR,
   });
