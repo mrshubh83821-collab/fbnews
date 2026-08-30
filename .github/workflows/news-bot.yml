@@ -16,6 +16,12 @@ on:
     - cron: "30 17 * * *"
   workflow_dispatch: {}
 
+# Only one run at a time - if a scheduled run and a manual run overlap, the
+# newer one waits instead of racing the older one for the same git push.
+concurrency:
+  group: news-bot-posting
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -51,4 +57,5 @@ jobs:
           git config --global user.email "bot@users.noreply.github.com"
           git add state/posted.json
           git diff --staged --quiet || git commit -m "Update posted news history"
+          git pull --rebase origin main
           git push
