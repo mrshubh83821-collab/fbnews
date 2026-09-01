@@ -1,8 +1,10 @@
 import fs from "fs";
+import path from "path";
 import { fetchTrendingNews } from "./lib/news-source.js";
 import { generateNewsCaption } from "./lib/caption.js";
 import { generateNewsCard } from "./lib/graphic-generator.js";
-import { postNewsPhoto } from "./lib/facebook-post.js";
+import { wrapImageAsReel } from "./lib/video-wrap.js";
+import { postReelToFacebook } from "./lib/facebook-reel.js";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const FB_PAGE_ID = process.env.FB_PAGE_ID;
@@ -11,6 +13,7 @@ const FB_PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
 const STATE_FILE = "./state/posted.json";
 const MAX_HISTORY = 1000;
 const TMP_DIR = "./tmp-news";
+const AUDIO_DIR = "./assets/audio";
 
 function loadState() {
   if (!fs.existsSync(STATE_FILE)) return { posted: [] };
@@ -29,6 +32,13 @@ function saveState(state) {
 
 function pickArticle(articles, alreadyPosted) {
   return articles.find((a) => !alreadyPosted.includes(a.link)) || null;
+}
+
+function pickRandomAudio() {
+  if (!fs.existsSync(AUDIO_DIR)) return null;
+  const files = fs.readdirSync(AUDIO_DIR).filter((f) => f.endsWith(".mp3") || f.endsWith(".m4a"));
+  if (files.length === 0) return null;
+  return path.join(AUDIO_DIR, files[Math.floor(Math.random() * files.length)]);
 }
 
 async function main() {
@@ -68,8 +78,14 @@ async function main() {
   });
   console.log("Graphic generated:", cardPath);
 
-  const result = await postNewsPhoto(cardPath, fullCaption);
-  console.log("Posted to Facebook successfully:", result.id || result.post_id);
+  const reelPath = `${TMP_DIR}/reel.mp4`;
+  const audioPath = pickRandomAudio();
+  console.log("Wrapping graphic into a Reel...");
+  wrapImageAsReel({ imagePath: cardPath, outputPath: reelPath, tmpDir: TMP_DIR, audioPath });
+  console.log("Reel generated:", reelPath);
+
+  const result = await postReelToFacebook(reelPath, fullCaption);
+  console.log("Posted to Facebook successfully:", result.id || result.video_id);
 
   state.posted.push(article.link);
   saveState(state);
